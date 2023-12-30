@@ -1,4 +1,4 @@
-package squirrel
+package squirrelly
 
 import (
 	"fmt"

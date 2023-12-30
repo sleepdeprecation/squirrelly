@@ -1,4 +1,4 @@
-module github.com/Masterminds/squirrel
+module github.com/sleepdeprecation/squirrelly
 
 go 1.14
 

@@ -1,8 +1,7 @@
-package squirrel
+package squirrelly
 
 import (
 	"bytes"
-	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -23,31 +22,6 @@ type insertData struct {
 	Values            [][]interface{}
 	Suffixes          []Sqlizer
 	Select            *SelectBuilder
-}
-
-func (d *insertData) Exec() (sql.Result, error) {
-	if d.RunWith == nil {
-		return nil, RunnerNotSet
-	}
-	return ExecWith(d.RunWith, d)
-}
-
-func (d *insertData) Query() (*sql.Rows, error) {
-	if d.RunWith == nil {
-		return nil, RunnerNotSet
-	}
-	return QueryWith(d.RunWith, d)
-}
-
-func (d *insertData) QueryRow() RowScanner {
-	if d.RunWith == nil {
-		return &Row{err: RunnerNotSet}
-	}
-	queryRower, ok := d.RunWith.(QueryRower)
-	if !ok {
-		return &Row{err: RunnerNotQueryRunner}
-	}
-	return QueryRowWith(queryRower, d)
 }
 
 func (d *insertData) ToSql() (sqlStr string, args []interface{}, err error) {
@@ -176,36 +150,6 @@ func init() {
 // query.
 func (b InsertBuilder) PlaceholderFormat(f PlaceholderFormat) InsertBuilder {
 	return builder.Set(b, "PlaceholderFormat", f).(InsertBuilder)
-}
-
-// Runner methods
-
-// RunWith sets a Runner (like database/sql.DB) to be used with e.g. Exec.
-func (b InsertBuilder) RunWith(runner BaseRunner) InsertBuilder {
-	return setRunWith(b, runner).(InsertBuilder)
-}
-
-// Exec builds and Execs the query with the Runner set by RunWith.
-func (b InsertBuilder) Exec() (sql.Result, error) {
-	data := builder.GetStruct(b).(insertData)
-	return data.Exec()
-}
-
-// Query builds and Querys the query with the Runner set by RunWith.
-func (b InsertBuilder) Query() (*sql.Rows, error) {
-	data := builder.GetStruct(b).(insertData)
-	return data.Query()
-}
-
-// QueryRow builds and QueryRows the query with the Runner set by RunWith.
-func (b InsertBuilder) QueryRow() RowScanner {
-	data := builder.GetStruct(b).(insertData)
-	return data.QueryRow()
-}
-
-// Scan is a shortcut for QueryRow().Scan.
-func (b InsertBuilder) Scan(dest ...interface{}) error {
-	return b.QueryRow().Scan(dest...)
 }
 
 // SQL methods

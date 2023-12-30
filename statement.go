@@ -1,4 +1,4 @@
-package squirrel
+package squirrelly
 
 import "github.com/lann/builder"
 
@@ -34,11 +34,6 @@ func (b StatementBuilderType) Delete(from string) DeleteBuilder {
 // PlaceholderFormat sets the PlaceholderFormat field for any child builders.
 func (b StatementBuilderType) PlaceholderFormat(f PlaceholderFormat) StatementBuilderType {
 	return builder.Set(b, "PlaceholderFormat", f).(StatementBuilderType)
-}
-
-// RunWith sets the RunWith field for any child builders.
-func (b StatementBuilderType) RunWith(runner BaseRunner) StatementBuilderType {
-	return setRunWith(b, runner).(StatementBuilderType)
 }
 
 // Where adds WHERE expressions to the query.

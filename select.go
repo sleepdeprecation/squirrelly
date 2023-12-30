@@ -1,8 +1,7 @@
-package squirrel
+package squirrelly
 
 import (
 	"bytes"
-	"database/sql"
 	"fmt"
 	"strings"
 
@@ -24,31 +23,6 @@ type selectData struct {
 	Limit             string
 	Offset            string
 	Suffixes          []Sqlizer
-}
-
-func (d *selectData) Exec() (sql.Result, error) {
-	if d.RunWith == nil {
-		return nil, RunnerNotSet
-	}
-	return ExecWith(d.RunWith, d)
-}
-
-func (d *selectData) Query() (*sql.Rows, error) {
-	if d.RunWith == nil {
-		return nil, RunnerNotSet
-	}
-	return QueryWith(d.RunWith, d)
-}
-
-func (d *selectData) QueryRow() RowScanner {
-	if d.RunWith == nil {
-		return &Row{err: RunnerNotSet}
-	}
-	queryRower, ok := d.RunWith.(QueryRower)
-	if !ok {
-		return &Row{err: RunnerNotQueryRunner}
-	}
-	return QueryRowWith(queryRower, d)
 }
 
 func (d *selectData) ToSql() (sqlStr string, args []interface{}, err error) {
@@ -177,39 +151,6 @@ func (b SelectBuilder) PlaceholderFormat(f PlaceholderFormat) SelectBuilder {
 	return builder.Set(b, "PlaceholderFormat", f).(SelectBuilder)
 }
 
-// Runner methods
-
-// RunWith sets a Runner (like database/sql.DB) to be used with e.g. Exec.
-// For most cases runner will be a database connection.
-//
-// Internally we use this to mock out the database connection for testing.
-func (b SelectBuilder) RunWith(runner BaseRunner) SelectBuilder {
-	return setRunWith(b, runner).(SelectBuilder)
-}
-
-// Exec builds and Execs the query with the Runner set by RunWith.
-func (b SelectBuilder) Exec() (sql.Result, error) {
-	data := builder.GetStruct(b).(selectData)
-	return data.Exec()
-}
-
-// Query builds and Querys the query with the Runner set by RunWith.
-func (b SelectBuilder) Query() (*sql.Rows, error) {
-	data := builder.GetStruct(b).(selectData)
-	return data.Query()
-}
-
-// QueryRow builds and QueryRows the query with the Runner set by RunWith.
-func (b SelectBuilder) QueryRow() RowScanner {
-	data := builder.GetStruct(b).(selectData)
-	return data.QueryRow()
-}
-
-// Scan is a shortcut for QueryRow().Scan.
-func (b SelectBuilder) Scan(dest ...interface{}) error {
-	return b.QueryRow().Scan(dest...)
-}
-
 // SQL methods
 
 // ToSql builds the query into a SQL string and bound args.
@@ -272,7 +213,8 @@ func (b SelectBuilder) RemoveColumns() SelectBuilder {
 // Column adds a result column to the query.
 // Unlike Columns, Column accepts args which will be bound to placeholders in
 // the columns string, for example:
-//   Column("IF(col IN ("+squirrel.Placeholders(3)+"), 1, 0) as col", 1, 2, 3)
+//
+//	Column("IF(col IN ("+squirrel.Placeholders(3)+"), 1, 0) as col", 1, 2, 3)
 func (b SelectBuilder) Column(column interface{}, args ...interface{}) SelectBuilder {
 	return builder.Append(b, "Columns", newPart(column, args...)).(SelectBuilder)
 }

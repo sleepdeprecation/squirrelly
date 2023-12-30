@@ -1,4 +1,4 @@
-package squirrel
+package squirrelly
 
 import (
 	"database/sql"
@@ -110,38 +110,6 @@ func TestSelectBuilderPlaceholders(t *testing.T) {
 
 	sql, _, _ = b.PlaceholderFormat(AtP).ToSql()
 	assert.Equal(t, "SELECT test WHERE x = @p1 AND y = @p2", sql)
-}
-
-func TestSelectBuilderRunners(t *testing.T) {
-	db := &DBStub{}
-	b := Select("test").RunWith(db)
-
-	expectedSql := "SELECT test"
-
-	b.Exec()
-	assert.Equal(t, expectedSql, db.LastExecSql)
-
-	b.Query()
-	assert.Equal(t, expectedSql, db.LastQuerySql)
-
-	b.QueryRow()
-	assert.Equal(t, expectedSql, db.LastQueryRowSql)
-
-	err := b.Scan()
-	assert.NoError(t, err)
-}
-
-func TestSelectBuilderNoRunner(t *testing.T) {
-	b := Select("test")
-
-	_, err := b.Exec()
-	assert.Equal(t, RunnerNotSet, err)
-
-	_, err = b.Query()
-	assert.Equal(t, RunnerNotSet, err)
-
-	err = b.Scan()
-	assert.Equal(t, RunnerNotSet, err)
 }
 
 func TestSelectBuilderSimpleJoin(t *testing.T) {
@@ -375,56 +343,6 @@ func ExampleSelectBuilder_Columns_order() {
 	sql, _, _ := query.ToSql()
 	fmt.Println(sql)
 	// Output: SELECT id, created, first_name FROM users
-}
-
-func ExampleSelectBuilder_Scan() {
-
-	var db *sql.DB
-
-	query := Select("id", "created", "first_name").From("users")
-	query = query.RunWith(db)
-
-	var id int
-	var created time.Time
-	var firstName string
-
-	if err := query.Scan(&id, &created, &firstName); err != nil {
-		log.Println(err)
-		return
-	}
-}
-
-func ExampleSelectBuilder_ScanContext() {
-
-	var db *sql.DB
-
-	query := Select("id", "created", "first_name").From("users")
-	query = query.RunWith(db)
-
-	var id int
-	var created time.Time
-	var firstName string
-
-	if err := query.ScanContext(ctx, &id, &created, &firstName); err != nil {
-		log.Println(err)
-		return
-	}
-}
-
-func ExampleSelectBuilder_RunWith() {
-
-	var db *sql.DB
-
-	query := Select("id", "created", "first_name").From("users").RunWith(db)
-
-	var id int
-	var created time.Time
-	var firstName string
-
-	if err := query.Scan(&id, &created, &firstName); err != nil {
-		log.Println(err)
-		return
-	}
 }
 
 func ExampleSelectBuilder_ToSql() {

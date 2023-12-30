@@ -1,4 +1,16 @@
+# Squirrelly - extensions on top of Squirrel
+
+Squirrelly is a set of extensions on top of [Squirrel](https://github.com/Masterminds/squirrel).
+Specifically, Squirrelly adds support for struct mapping, some additional options for query builders, table manipulation query builders, and a layer on top of `sql.DB`, similar to [sqlx](https://github.com/jmoiron/sqlx).
+
+
+
+
+
+# Original Squirrel README
+
 [![Stability: Maintenance](https://masterminds.github.io/stability/maintenance.svg)](https://masterminds.github.io/stability/maintenance.html)
+
 ### Squirrel is "complete".
 Bug fixes will still be merged (slowly). Bug reports are welcome, but I will not necessarily respond to them. If another fork (or substantially similar project) actively improves on what Squirrel does, let me know and I may link to it here.
 
@@ -11,7 +23,6 @@ import "github.com/Masterminds/squirrel"
 
 
 [![GoDoc](https://godoc.org/github.com/Masterminds/squirrel?status.png)](https://godoc.org/github.com/Masterminds/squirrel)
-[![Build Status](https://api.travis-ci.org/Masterminds/squirrel.svg?branch=master)](https://travis-ci.org/Masterminds/squirrel)
 
 **Squirrel is not an ORM.** For an application of Squirrel, check out
 [structable, a table-struct mapper](https://github.com/Masterminds/structable)

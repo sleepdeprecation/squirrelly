@@ -1,4 +1,4 @@
-package squirrel
+package squirrelly
 
 import (
 	"testing"
@@ -64,23 +64,6 @@ func TestUpdateBuilderPlaceholders(t *testing.T) {
 
 	sql, _, _ = b.PlaceholderFormat(Dollar).ToSql()
 	assert.Equal(t, "UPDATE test SET x = $1, y = $2", sql)
-}
-
-func TestUpdateBuilderRunners(t *testing.T) {
-	db := &DBStub{}
-	b := Update("test").Set("x", 1).RunWith(db)
-
-	expectedSql := "UPDATE test SET x = ?"
-
-	b.Exec()
-	assert.Equal(t, expectedSql, db.LastExecSql)
-}
-
-func TestUpdateBuilderNoRunner(t *testing.T) {
-	b := Update("test").Set("x", 1)
-
-	_, err := b.Exec()
-	assert.Equal(t, RunnerNotSet, err)
 }
 
 func TestUpdateBuilderFrom(t *testing.T) {
