@@ -8,10 +8,12 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+// Type Db is a wrapper around sqlx.Db (which itself is a wrapper around sql.Db)
 type Db struct {
 	*sqlx.DB
 }
 
+// Open uses the same convention as [database/sql.Open], a driver name and a source string, both dependant on your driver's package.
 func Open(driver, source string) (*Db, error) {
 	sqldb, err := sqlx.Open(driver, source)
 	if err != nil {
@@ -21,6 +23,7 @@ func Open(driver, source string) (*Db, error) {
 	return &Db{sqldb}, nil
 }
 
+// Exec runs [database/sql.DB.Exec], using a squirrelly builder.
 func (db *Db) Exec(query Sqlizer) (sql.Result, error) {
 	sql, args, err := query.ToSql()
 	if err != nil {
@@ -30,6 +33,7 @@ func (db *Db) Exec(query Sqlizer) (sql.Result, error) {
 	return db.DB.Exec(sql, args...)
 }
 
+// Query runs [github.com/jmoiron/sqlx.DB.Queryx] (equivalent to [database/sql.DB.Query]), using a squirrelly builder.
 func (db *Db) Query(query Sqlizer) (*sqlx.Rows, error) {
 	sql, args, err := query.ToSql()
 	if err != nil {
@@ -39,6 +43,7 @@ func (db *Db) Query(query Sqlizer) (*sqlx.Rows, error) {
 	return db.Queryx(sql, args...)
 }
 
+// QueryRow runs [github.com/jmoiron/sqlx.DB.QueryRowx] (equivalent to [database/sql.DB.QueryRow]), using a squirrelly builder.
 func (db *Db) QueryRow(query Sqlizer) *sqlx.Row {
 	sql, args, err := query.ToSql()
 	if err != nil {
@@ -48,6 +53,9 @@ func (db *Db) QueryRow(query Sqlizer) *sqlx.Row {
 	return db.QueryRowx(sql, args...)
 }
 
+// Get runs a query using a squirrelly builder (that should return one and only one result), and marshals the result into the data interface.
+//
+// The data argument must be a pointer, it supports any value that [database/sql.Rows.Scan] supports, or structs that are tagged using the `sq` tag, similar to how the [encoding/json.Marshal] function works using the `json` tag.
 func (db *Db) Get(query Sqlizer, data interface{}) error {
 	row := db.QueryRow(query)
 	err := row.Err()
@@ -58,6 +66,9 @@ func (db *Db) Get(query Sqlizer, data interface{}) error {
 	return row.StructScan(data)
 }
 
+// GetAll runs a query using a squirrelly builder, and marshals the resulting records into the data interface.
+//
+// The container argument must be a pointer to a slice, the slice may be of any value that [database/sql.Rows.Scan] supports, or structs that are tagged using the `sq` tag, similar to how the [encoding/json.Marshal] function works using the `json` tag.
 func (db *Db) GetAll(query Sqlizer, container interface{}) error {
 	rows, err := db.Query(query)
 	if err != nil {
