@@ -1,153 +1,50 @@
-# Squirrelly - extensions on top of Squirrel
+# Squirrelly - Squirrel with better struct support
 
-Squirrelly is a set of extensions on top of [Squirrel](https://github.com/Masterminds/squirrel).
-Specifically, Squirrelly adds support for struct mapping, some additional options for query builders, table manipulation query builders, and a layer on top of `sql.DB`, similar to [sqlx](https://github.com/jmoiron/sqlx).
+The most common database operations are converting structs into database records and turning database records into structs.
+The goal of Squirrelly is to take the wonderful fluent sql builder of [Squirrel](https://github.com/Masterminds/squirrel) and add struct to record and record to struct mappings.
 
+[![CoDoc](https://pkg.go.dev/github.com/sleepdeprecation/squirrelly?status.png)](https://pkg.go.dev/github.com/sleepdeprecation/squirrelly)
 
+``` go
+import (
+    sq "github.com/sleepdeprecation/squirrelly"
+    _ "modernc.org/sqlite"
+)
 
+type Comment struct {
+    Id int `sq:"id"`
+    Comment string `sq:"comment"`
+    CommenterEmail string `sq:"commenter_email"`
+}
 
+func main() {
+    db, err := sq.Open("sqlite", "file::memory:")
 
-# Original Squirrel README
+	// you can use db.DB to access the *sqlx.DB functions directly
+	// (these match the *sql.Db functions, with some additions).
+	db.DB.Exec("CREATE TABLE example (pk INTEGER PRIMARY KEY AUTOINCREMENT, comment TEXT NOT NULL)")
 
-[![Stability: Maintenance](https://masterminds.github.io/stability/maintenance.svg)](https://masterminds.github.io/stability/maintenance.html)
+    db.Exec(sq.Insert("example").Columns("comment", "commenter_email").StructValues(&Comment{
+        Comment: "my fun comment",
+        CommenterEmail: "foo@example.com",
+    }))
 
-### Squirrel is "complete".
-Bug fixes will still be merged (slowly). Bug reports are welcome, but I will not necessarily respond to them. If another fork (or substantially similar project) actively improves on what Squirrel does, let me know and I may link to it here.
+    record := Comment{}
+    err = db.Get(sq.Select("*").From("example").Where(sq.Eq{"commenter_email": "foo@example.com"}, &record).Limit(1))
+    // record should now equal
+    //  Comment{Comment: "my fun comment", CommenterEmail: "foo@example.com"}
 
-
-# Squirrel - fluent SQL generator for Go
-
-```go
-import "github.com/Masterminds/squirrel"
-```
-
-
-[![GoDoc](https://godoc.org/github.com/Masterminds/squirrel?status.png)](https://godoc.org/github.com/Masterminds/squirrel)
-
-**Squirrel is not an ORM.** For an application of Squirrel, check out
-[structable, a table-struct mapper](https://github.com/Masterminds/structable)
-
-
-Squirrel helps you build SQL queries from composable parts:
-
-```go
-import sq "github.com/Masterminds/squirrel"
-
-users := sq.Select("*").From("users").Join("emails USING (email_id)")
-
-active := users.Where(sq.Eq{"deleted_at": nil})
-
-sql, args, err := active.ToSql()
-
-sql == "SELECT * FROM users JOIN emails USING (email_id) WHERE deleted_at IS NULL"
-```
-
-```go
-sql, args, err := sq.
-    Insert("users").Columns("name", "age").
-    Values("moe", 13).Values("larry", sq.Expr("? + 5", 12)).
-    ToSql()
-
-sql == "INSERT INTO users (name,age) VALUES (?,?),(?,? + 5)"
-```
-
-Squirrel can also execute queries directly:
-
-```go
-stooges := users.Where(sq.Eq{"username": []string{"moe", "larry", "curly", "shemp"}})
-three_stooges := stooges.Limit(3)
-rows, err := three_stooges.RunWith(db).Query()
-
-// Behaves like:
-rows, err := db.Query("SELECT * FROM users WHERE username IN (?,?,?,?) LIMIT 3",
-                      "moe", "larry", "curly", "shemp")
-```
-
-Squirrel makes conditional query building a breeze:
-
-```go
-if len(q) > 0 {
-    users = users.Where("name LIKE ?", fmt.Sprint("%", q, "%"))
+    records := []*Comment{}
+    err = db.GetAll(sq.Select("*").From("example"), &records)
 }
 ```
 
-Squirrel wants to make your life easier:
-
-```go
-// StmtCache caches Prepared Stmts for you
-dbCache := sq.NewStmtCache(db)
-
-// StatementBuilder keeps your syntax neat
-mydb := sq.StatementBuilder.RunWith(dbCache)
-select_users := mydb.Select("*").From("users")
-```
-
-Squirrel loves PostgreSQL:
-
-```go
-psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
-
-// You use question marks for placeholders...
-sql, _, _ := psql.Select("*").From("elephants").Where("name IN (?,?)", "Dumbo", "Verna").ToSql()
-
-/// ...squirrel replaces them using PlaceholderFormat.
-sql == "SELECT * FROM elephants WHERE name IN ($1,$2)"
+Check out the [original Squirrel README](https://github.com/Masterminds/squirrel) for more information on how the SQL generator works.
 
 
-/// You can retrieve id ...
-query := sq.Insert("nodes").
-    Columns("uuid", "type", "data").
-    Values(node.Uuid, node.Type, node.Data).
-    Suffix("RETURNING \"id\"").
-    RunWith(m.db).
-    PlaceholderFormat(sq.Dollar)
+## Changes from Squirrel
 
-query.QueryRow().Scan(&node.id)
-```
+Squirrelly is lacking several features from the original Squirrel, specifically the `RunWith`, `Query`, and `Exec` functions have been removed from the query builders themselves.
+In their place, Squirrelly uses a separate database abstraction to handle the queries.
 
-You can escape question marks by inserting two question marks:
-
-```sql
-SELECT * FROM nodes WHERE meta->'format' ??| array[?,?]
-```
-
-will generate with the Dollar Placeholder:
-
-```sql
-SELECT * FROM nodes WHERE meta->'format' ?| array[$1,$2]
-```
-
-## FAQ
-
-* **How can I build an IN query on composite keys / tuples, e.g. `WHERE (col1, col2) IN ((1,2),(3,4))`? ([#104](https://github.com/Masterminds/squirrel/issues/104))**
-
-    Squirrel does not explicitly support tuples, but you can get the same effect with e.g.:
-
-    ```go
-    sq.Or{
-      sq.Eq{"col1": 1, "col2": 2},
-      sq.Eq{"col1": 3, "col2": 4}}
-    ```
-
-    ```sql
-    WHERE (col1 = 1 AND col2 = 2) OR (col1 = 3 AND col2 = 4)
-    ```
-
-    (which should produce the same query plan as the tuple version)
-
-* **Why doesn't `Eq{"mynumber": []uint8{1,2,3}}` turn into an `IN` query? ([#114](https://github.com/Masterminds/squirrel/issues/114))**
-
-    Values of type `[]byte` are handled specially by `database/sql`. In Go, [`byte` is just an alias of `uint8`](https://golang.org/pkg/builtin/#byte), so there is no way to distinguish `[]uint8` from `[]byte`.
-
-* **Some features are poorly documented!**
-
-    This isn't a frequent complaints section!
-
-* **Some features are poorly documented?**
-
-    Yes. The tests should be considered a part of the documentation; take a look at those for ideas on how to express more complex queries.
-
-## License
-
-Squirrel is released under the
-[MIT License](http://www.opensource.org/licenses/MIT).
+As Squirrelly is more focused on mapping structs and database records together, it adds a new `StructValues` function to the `InsertBuilder`, which directly maps structs into insert values.
