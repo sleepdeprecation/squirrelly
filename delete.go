@@ -10,7 +10,6 @@ import (
 
 type deleteData struct {
 	PlaceholderFormat PlaceholderFormat
-	RunWith           BaseRunner
 	Prefixes          []Sqlizer
 	From              string
 	WhereParts        []Sqlizer

@@ -1,6 +1,6 @@
-// Package squirrel provides a fluent SQL generator.
+// Package squirrelly provides a fluent SQL generator with an integration with database/sql.
 //
-// See https://github.com/Masterminds/squirrel for examples.
+// Based on https://github.com/Masterminds/squirrel for examples.
 package squirrelly
 
 import (

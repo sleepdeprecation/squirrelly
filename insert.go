@@ -5,15 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"sort"
 	"strings"
 
+	"github.com/jmoiron/sqlx/reflectx"
 	"github.com/lann/builder"
 )
 
 type insertData struct {
 	PlaceholderFormat PlaceholderFormat
-	RunWith           BaseRunner
 	Prefixes          []Sqlizer
 	StatementKeyword  string
 	Options           []string
@@ -22,6 +23,9 @@ type insertData struct {
 	Values            [][]interface{}
 	Suffixes          []Sqlizer
 	Select            *SelectBuilder
+	ConflictKeys      []string
+	UpdateColumns     []string
+	Returning         []string
 }
 
 func (d *insertData) ToSql() (sqlStr string, args []interface{}, err error) {
@@ -74,6 +78,25 @@ func (d *insertData) ToSql() (sqlStr string, args []interface{}, err error) {
 	}
 	if err != nil {
 		return
+	}
+
+	if len(d.ConflictKeys) > 0 {
+		sql.WriteString(" ON CONFLICT (")
+		sql.WriteString(strings.Join(d.ConflictKeys, ","))
+		sql.WriteString(")")
+
+		if len(d.UpdateColumns) > 0 {
+			sql.WriteString(" DO UPDATE SET")
+			for idx, col := range d.UpdateColumns {
+				if idx != 0 {
+					sql.WriteString(",")
+				}
+
+				sql.WriteString(fmt.Sprintf(" %[1]s = EXCLUDED.%[1]s", col))
+			}
+		} else {
+			err = errors.New("insert statements with OnConflict set must have at least one column to be updated")
+		}
 	}
 
 	if len(d.Suffixes) > 0 {
@@ -231,6 +254,16 @@ func (b InsertBuilder) SetMap(clauses map[string]interface{}) InsertBuilder {
 	return b
 }
 
+// OnConflict is used to turn an insert into an upsert. This is used to add the ON CONFLICT (keys ...) clause. When used with [UpdateColumns] the insert builder adds ON CONFLICT (keys ...) DO UPDATE SET ....
+func (b InsertBuilder) OnConflict(conflictKeys ...string) InsertBuilder {
+	return builder.Extend(b, "ConflictKeys", conflictKeys).(InsertBuilder)
+}
+
+// UpdateColumns, when used with [OnConflict], generates ON CONFLICT DO UPDATE clauses to the insert builder.
+func (b InsertBuilder) UpdateColumns(columns ...string) InsertBuilder {
+	return builder.Extend(b, "UpdateColumns", columns).(InsertBuilder)
+}
+
 // Select set Select clause for insert query
 // If Values and Select are used, then Select has higher priority
 func (b InsertBuilder) Select(sb SelectBuilder) InsertBuilder {
@@ -239,4 +272,36 @@ func (b InsertBuilder) Select(sb SelectBuilder) InsertBuilder {
 
 func (b InsertBuilder) statementKeyword(keyword string) InsertBuilder {
 	return builder.Set(b, "StatementKeyword", keyword).(InsertBuilder)
+}
+
+// StructValues sets values for an insert builder based on the columns already set and the "sq" tag on the struct's value.
+// For example
+//
+//	s := struct{A `sq:"a"`}{A: "foo"}
+//	Insert().Columns("a").StructValues(&s)
+//
+//	// is equivalent to
+//	Insert().Columns("a").Values(s.A)
+func (b InsertBuilder) StructValues(data interface{}) InsertBuilder {
+	if data == nil {
+		return b
+	}
+
+	mapper := reflectx.NewMapper("sq")
+	lookup := mapper.FieldMap(reflect.ValueOf(data))
+
+	rawColumns, _ := builder.Get(b, "Columns")
+	columns := rawColumns.([]string)
+
+	values := make([]interface{}, len(columns))
+	for idx, columnName := range columns {
+		value, hasValue := lookup[columnName]
+		if !hasValue {
+			panic(fmt.Errorf("missing column `%[1]s` in struct. Is it tagged with `sq:\"%[1]s\"`?", columnName))
+		}
+
+		values[idx] = value.Interface()
+	}
+
+	return b.Values(values...)
 }

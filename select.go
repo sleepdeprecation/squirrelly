@@ -10,7 +10,6 @@ import (
 
 type selectData struct {
 	PlaceholderFormat PlaceholderFormat
-	RunWith           BaseRunner
 	Prefixes          []Sqlizer
 	Options           []string
 	Columns           []Sqlizer
