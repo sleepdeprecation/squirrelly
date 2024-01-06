@@ -297,7 +297,7 @@ func (b InsertBuilder) StructValues(data interface{}) InsertBuilder {
 		return b
 	}
 
-	mapper := reflectx.NewMapper("sq")
+	mapper := getMapper()
 	lookup := mapper.FieldMap(reflect.ValueOf(data))
 
 	rawColumns, _ := builder.Get(b, "Columns")

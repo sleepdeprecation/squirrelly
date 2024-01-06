@@ -7,7 +7,19 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+
+	"github.com/jmoiron/sqlx/reflectx"
 )
+
+var mapper *reflectx.Mapper
+
+func getMapper() *reflectx.Mapper {
+	if mapper == nil {
+		mapper = reflectx.NewMapper("sq")
+	}
+
+	return mapper
+}
 
 // Sqlizer is the interface that wraps the ToSql method.
 //

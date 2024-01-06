@@ -159,7 +159,7 @@ func TestInsertStruct(t *testing.T) {
 	sql, args, err := ib.ToSql()
 	assert.NoError(t, err)
 	assert.Equal(t, expectedSql, sql)
-	assert.ElementsMatch(t, expectedArgs, args)
+	assert.Equal(t, expectedArgs, args)
 }
 
 func TestInsertReturning(t *testing.T) {
