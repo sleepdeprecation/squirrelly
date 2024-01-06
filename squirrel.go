@@ -1,11 +1,10 @@
 // Package squirrelly provides a fluent SQL generator with an integration with database/sql.
 //
-// Based on https://github.com/Masterminds/squirrel for examples.
+// Based on https://github.com/Masterminds/squirrel.
 package squirrelly
 
 import (
 	"bytes"
-	"database/sql"
 	"fmt"
 	"strings"
 )
@@ -22,40 +21,6 @@ type Sqlizer interface {
 // This is useful for nested queries.
 type rawSqlizer interface {
 	toSqlRaw() (string, []interface{}, error)
-}
-
-// Execer is the interface that wraps the Exec method.
-//
-// Exec executes the given query as implemented by database/sql.Exec.
-type Execer interface {
-	Exec(query string, args ...interface{}) (sql.Result, error)
-}
-
-// Queryer is the interface that wraps the Query method.
-//
-// Query executes the given query as implemented by database/sql.Query.
-type Queryer interface {
-	Query(query string, args ...interface{}) (*sql.Rows, error)
-}
-
-// QueryRower is the interface that wraps the QueryRow method.
-//
-// QueryRow executes the given query as implemented by database/sql.QueryRow.
-type QueryRower interface {
-	QueryRow(query string, args ...interface{}) RowScanner
-}
-
-// BaseRunner groups the Execer and Queryer interfaces.
-type BaseRunner interface {
-	Execer
-	Queryer
-}
-
-// Runner groups the Execer, Queryer, and QueryRower interfaces.
-type Runner interface {
-	Execer
-	Queryer
-	QueryRower
 }
 
 // DebugSqlizer calls ToSql on s and shows the approximate SQL to be executed

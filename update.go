@@ -11,7 +11,6 @@ import (
 
 type updateData struct {
 	PlaceholderFormat PlaceholderFormat
-	RunWith           BaseRunner
 	Prefixes          []Sqlizer
 	Table             string
 	SetClauses        []setClause
