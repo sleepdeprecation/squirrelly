@@ -3,21 +3,20 @@ package squirrelly
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"reflect"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx/reflectx"
 )
 
-// Type Db is a wrapper around sqlx.Db (which itself is a wrapper around sql.Db)
+// Type Db is a wrapper around sql.Db
 type Db struct {
-	*sqlx.DB
+	*sql.DB
 }
-
-type Tx sqlx.Tx
 
 // Open uses the same convention as [database/sql.Open], a driver name and a source string, both dependant on your driver's package.
 func Open(driver, source string) (*Db, error) {
-	sqldb, err := sqlx.Open(driver, source)
+	sqldb, err := sql.Open(driver, source)
 	if err != nil {
 		return nil, err
 	}
@@ -35,37 +34,36 @@ func (db *Db) Exec(query Sqlizer) (sql.Result, error) {
 	return db.DB.Exec(sql, args...)
 }
 
-// Query runs [github.com/jmoiron/sqlx.DB.Queryx] (equivalent to [database/sql.DB.Query]), using a squirrelly builder.
-func (db *Db) Query(query Sqlizer) (*sqlx.Rows, error) {
+// Query runs [database/sql.DB.Query] using a squirrelly builder.
+func (db *Db) Query(query Sqlizer) (*sql.Rows, error) {
 	sql, args, err := query.ToSql()
 	if err != nil {
 		return nil, err
 	}
 
-	return db.Queryx(sql, args...)
+	return db.DB.Query(sql, args...)
 }
 
-// QueryRow runs [github.com/jmoiron/sqlx.DB.QueryRowx] (equivalent to [database/sql.DB.QueryRow]), using a squirrelly builder.
-func (db *Db) QueryRow(query Sqlizer) *sqlx.Row {
+// QueryRow runs [database/sql.DB.QueryRow] using a squirrelly builder.
+func (db *Db) QueryRow(query Sqlizer) *sql.Row {
 	sql, args, err := query.ToSql()
 	if err != nil {
 		panic(err)
 	}
 
-	return db.QueryRowx(sql, args...)
+	return db.DB.QueryRow(sql, args...)
 }
 
 // Get runs a query using a squirrelly builder (that should return one and only one result), and marshals the result into the data interface.
 //
 // The data argument must be a pointer, it supports any value that [database/sql.Rows.Scan] supports, or structs that are tagged using the `sq` tag, similar to how the [encoding/json.Marshal] function works using the `json` tag.
 func (db *Db) Get(query Sqlizer, data interface{}) error {
-	row := db.QueryRow(query)
-	err := row.Err()
+	rows, err := db.Query(query)
 	if err != nil {
 		return err
 	}
 
-	return row.StructScan(data)
+	return structScan(rows, data)
 }
 
 // GetAll runs a query using a squirrelly builder, and marshals the resulting records into the data interface.
@@ -76,6 +74,10 @@ func (db *Db) GetAll(query Sqlizer, container interface{}) error {
 	if err != nil {
 		return err
 	}
+	defer rows.Close()
+
+	// we don't need to error check -- rows can't be closed yet
+	columns, _ := rows.Columns()
 
 	containerValue := reflect.ValueOf(container)
 	if containerValue.Kind() != reflect.Ptr {
@@ -99,19 +101,30 @@ func (db *Db) GetAll(query Sqlizer, container interface{}) error {
 		elemType = elemType.Elem()
 	}
 
-	isStruct := elemType.Kind() == reflect.Struct
+	mapper := getMapper()
+	fieldTraversals := mapper.TraversalsByName(elemType, columns)
+	for idx, f := range fieldTraversals {
+		if len(f) == 0 {
+			return fmt.Errorf("missing destination name %s in %s", columns[idx], elemType.Name())
+		}
+	}
 
 	rawValues := []reflect.Value{}
-	err = scanRows(rows, func(row *sqlx.Rows) error {
+	err = scanRows(rows, func(row *sql.Rows) error {
 		elem := reflect.New(elemType)
 
-		var err error
-		if isStruct {
-			err = row.StructScan(elem.Interface())
+		var elemValues []interface{}
+		if len(columns) == 1 {
+			elemValues = []interface{}{elem.Interface()}
 		} else {
-			err = row.Scan(elem.Interface())
+			elemValues = make([]interface{}, len(columns))
+			for idx, traversal := range fieldTraversals {
+				field := reflectx.FieldByIndexes(elem, traversal)
+				elemValues[idx] = field.Addr().Interface()
+			}
 		}
 
+		err := row.Scan(elemValues...)
 		if err != nil {
 			return err
 		}
@@ -135,7 +148,7 @@ func (db *Db) GetAll(query Sqlizer, container interface{}) error {
 	return nil
 }
 
-func scanRows(rows *sqlx.Rows, fn func(*sqlx.Rows) error) error {
+func scanRows(rows *sql.Rows, fn func(*sql.Rows) error) error {
 	defer rows.Close()
 	for rows.Next() {
 		err := rows.Err()
@@ -147,6 +160,49 @@ func scanRows(rows *sqlx.Rows, fn func(*sqlx.Rows) error) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func structScan(rows *sql.Rows, destination interface{}) error {
+	dest := reflect.ValueOf(destination)
+	if dest.Kind() != reflect.Ptr {
+		return errors.New("destination is not a pointer")
+	}
+	typ := dest.Elem().Type()
+	if typ.Kind() != reflect.Struct {
+		return errors.New("destination is not a struct")
+	}
+
+	defer rows.Close()
+	if !rows.Next() {
+		return sql.ErrNoRows
+	}
+
+	// value := reflect.New(typ)
+	columns, _ := rows.Columns()
+
+	mapper := getMapper()
+	fieldTraversals := mapper.TraversalsByName(typ, columns)
+
+	scanInterfaces := make([]interface{}, len(columns))
+	for idx, f := range fieldTraversals {
+		if len(f) == 0 {
+			return fmt.Errorf("missing destination name %s in %s", columns[idx], typ.Name())
+		}
+
+		field := reflectx.FieldByIndexes(dest, f)
+		scanInterfaces[idx] = field.Addr().Interface()
+	}
+
+	err := rows.Scan(scanInterfaces...)
+	if err != nil {
+		return err
+	}
+
+	if rows.Next() {
+		return errors.New("trying to scan multiple rows into a single struct")
 	}
 
 	return nil

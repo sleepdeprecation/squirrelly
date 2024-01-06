@@ -24,11 +24,6 @@ func TestDbGet(t *testing.T) {
 	_, err = db.Exec(insert)
 	assert.NoError(t, err)
 
-	record := &foo{}
-	query := sq.Select("*").From("foo").Where(sq.Eq{"pk": 1})
-	assert.NoError(t, db.Get(query, record))
-	assert.Equal(t, record, &foo{Pk: 1, Comment: "comment"})
-
 	_, err = db.Exec(sq.Insert("foo").Columns("pk", "comment").StructValues(&foo{Pk: 10, Comment: "another comment"}))
 	assert.NoError(t, err)
 
@@ -36,6 +31,12 @@ func TestDbGet(t *testing.T) {
 	getAllQuery := sq.Select("*").From("foo")
 	assert.NoError(t, db.GetAll(getAllQuery, &records))
 	assert.Equal(t, records, []*foo{&foo{Pk: 1, Comment: "comment"}, &foo{Pk: 10, Comment: "another comment"}})
+
+	record := &foo{}
+	query := sq.Select("*").From("foo").Where(sq.Eq{"pk": 1})
+	assert.NoError(t, db.Get(query, record))
+	assert.Equal(t, record, &foo{Pk: 1, Comment: "comment"})
+
 }
 
 func ExampleDb() {
