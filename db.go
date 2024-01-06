@@ -13,6 +13,8 @@ type Db struct {
 	*sqlx.DB
 }
 
+type Tx sqlx.Tx
+
 // Open uses the same convention as [database/sql.Open], a driver name and a source string, both dependant on your driver's package.
 func Open(driver, source string) (*Db, error) {
 	sqldb, err := sqlx.Open(driver, source)
