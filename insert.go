@@ -259,16 +259,17 @@ func (b InsertBuilder) SetMap(clauses map[string]interface{}) InsertBuilder {
 	return b
 }
 
-// OnConflict is used to turn an insert into an upsert. This is used to add the ON CONFLICT (keys ...) clause. When used with [UpdateColumns] the insert builder adds ON CONFLICT (keys ...) DO UPDATE SET ....
+// OnConflict is used to turn an insert into an upsert. This is used to add the ON CONFLICT (keys ...) clause. When used with [InsertBuilder.UpdateColumns] the insert builder adds ON CONFLICT (keys ...) DO UPDATE SET ....
 func (b InsertBuilder) OnConflict(conflictKeys ...string) InsertBuilder {
 	return builder.Extend(b, "ConflictKeys", conflictKeys).(InsertBuilder)
 }
 
-// UpdateColumns, when used with [OnConflict], generates ON CONFLICT DO UPDATE clauses to the insert builder.
+// UpdateColumns, when used with [InsertBuilder.OnConflict], generates ON CONFLICT DO UPDATE clauses to the insert builder.
 func (b InsertBuilder) UpdateColumns(columns ...string) InsertBuilder {
 	return builder.Extend(b, "UpdateColumns", columns).(InsertBuilder)
 }
 
+// Returning adds a RETURNING <columns> suffix (before the [InsertBuilder.Suffix]) to the insert builder.
 func (b InsertBuilder) Returning(columns ...string) InsertBuilder {
 	return builder.Extend(b, "Returning", columns).(InsertBuilder)
 }
