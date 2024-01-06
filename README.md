@@ -3,7 +3,7 @@
 The most common database operations are converting structs into database records and turning database records into structs.
 The goal of Squirrelly is to take the wonderful fluent sql builder of [Squirrel](https://github.com/Masterminds/squirrel) and add struct to record and record to struct mappings.
 
-[![CoDoc](https://pkg.go.dev/github.com/sleepdeprecation/squirrelly?status.png)](https://pkg.go.dev/github.com/sleepdeprecation/squirrelly)
+[![CoDoc](https://pkg.go.dev/badge/github.com/sleepdeprecation/squirrelly.svg)](https://pkg.go.dev/github.com/sleepdeprecation/squirrelly)
 
 ``` go
 import (
