@@ -305,3 +305,39 @@ func (b InsertBuilder) StructValues(data interface{}) InsertBuilder {
 
 	return b.Values(values...)
 }
+
+// Struct sets the columns and values for an insert builder based on a struct's tags
+//
+// For example
+//
+//	type Foo struct {
+//		A string `sq:"a"`
+//		B string `sq:"column_b"`
+//	}
+//
+//	record := Foo{A: "a value", B: "another value"}
+//
+//	// these lines have the same result
+//	Insert("table").Struct(&record)
+//	Insert("table").Columns("a", "b").StructValues(&record)
+func (b InsertBuilder) Struct(data interface{}) InsertBuilder {
+	if data == nil {
+		return b
+	}
+
+	mapper := reflectx.NewMapper("sq")
+	lookup := mapper.FieldMap(reflect.ValueOf(data))
+
+	columns := make([]string, len(lookup))
+	values := make([]interface{}, len(lookup))
+
+	idx := 0
+	for column, value := range lookup {
+		columns[idx] = column
+		values[idx] = value.Interface()
+
+		idx += 1
+	}
+
+	return b.Columns(columns...).Values(values...)
+}

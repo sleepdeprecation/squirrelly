@@ -141,3 +141,23 @@ func TestInsertStructValuesNotMapped(t *testing.T) {
 		},
 	)
 }
+
+func TestInsertStruct(t *testing.T) {
+	record := struct {
+		Pk      int    `sq:"pk"`
+		Comment string `sq:"comment"`
+	}{
+		Pk:      1,
+		Comment: "foo",
+	}
+
+	ib := Insert("table").Struct(&record)
+
+	expectedSql := "INSERT INTO table (pk,comment) VALUES (?,?)"
+	expectedArgs := []interface{}{1, "foo"}
+
+	sql, args, err := ib.ToSql()
+	assert.NoError(t, err)
+	assert.Equal(t, expectedSql, sql)
+	assert.ElementsMatch(t, expectedArgs, args)
+}
