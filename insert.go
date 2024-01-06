@@ -99,6 +99,11 @@ func (d *insertData) ToSql() (sqlStr string, args []interface{}, err error) {
 		}
 	}
 
+	if len(d.Returning) > 0 {
+		sql.WriteString(" RETURNING ")
+		sql.WriteString(strings.Join(d.Returning, ","))
+	}
+
 	if len(d.Suffixes) > 0 {
 		sql.WriteString(" ")
 		args, err = appendToSql(d.Suffixes, sql, " ", args)
@@ -262,6 +267,10 @@ func (b InsertBuilder) OnConflict(conflictKeys ...string) InsertBuilder {
 // UpdateColumns, when used with [OnConflict], generates ON CONFLICT DO UPDATE clauses to the insert builder.
 func (b InsertBuilder) UpdateColumns(columns ...string) InsertBuilder {
 	return builder.Extend(b, "UpdateColumns", columns).(InsertBuilder)
+}
+
+func (b InsertBuilder) Returning(columns ...string) InsertBuilder {
+	return builder.Extend(b, "Returning", columns).(InsertBuilder)
 }
 
 // Select set Select clause for insert query

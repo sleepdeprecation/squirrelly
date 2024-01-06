@@ -161,3 +161,17 @@ func TestInsertStruct(t *testing.T) {
 	assert.Equal(t, expectedSql, sql)
 	assert.ElementsMatch(t, expectedArgs, args)
 }
+
+func TestInsertReturning(t *testing.T) {
+	b := Insert("").
+		Into("a").
+		Columns("b", "c").
+		Values(1, 2).
+		Returning("pk")
+
+	sql, _, err := b.ToSql()
+	assert.NoError(t, err)
+
+	expectedSQL := "INSERT INTO a (b,c) VALUES (?,?) RETURNING pk"
+	assert.Equal(t, expectedSQL, sql)
+}
