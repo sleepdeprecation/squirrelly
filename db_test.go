@@ -62,6 +62,18 @@ func TestTx(t *testing.T) {
 	getAllQuery := sq.Select("*").From("foo")
 	assert.NoError(t, db.GetAll(getAllQuery, &records))
 	assert.Equal(t, records, []*foo{&foo{Pk: 1, Comment: "comment"}})
+
+	assert.NoError(t, db.WithTx(func(tx sq.DbLike) error {
+		insert := sq.Insert("foo").Columns("pk", "comment").StructValues(&foo{Pk: 77, Comment: "lucky numbers sevens"})
+		_, err := tx.Exec(insert)
+		return err
+	}))
+
+	assert.NoError(t, db.GetAll(getAllQuery, &records))
+	assert.Equal(t, records, []*foo{
+		&foo{Pk: 1, Comment: "comment"},
+		&foo{Pk: 77, Comment: "lucky numbers sevens"},
+	})
 }
 
 func ExampleDb() {

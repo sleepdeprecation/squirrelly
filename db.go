@@ -53,6 +53,22 @@ func (db *Db) Begin() (*Tx, error) {
 	return &Tx{tx}, nil
 }
 
+func (db *Db) WithTx(fn func(DbLike) error) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback()
+
+	err = fn(tx)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 // Exec runs [database/sql.DB.Exec], using a squirrelly builder.
 func Exec(db Querier, query Sqlizer) (sql.Result, error) {
 	sql, args, err := query.ToSql()
