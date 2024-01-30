@@ -36,7 +36,32 @@ func TestDbGet(t *testing.T) {
 	query := sq.Select("*").From("foo").Where(sq.Eq{"pk": 1})
 	assert.NoError(t, db.Get(query, record))
 	assert.Equal(t, record, &foo{Pk: 1, Comment: "comment"})
+}
 
+func TestTx(t *testing.T) {
+	db, _ := sq.Open("sqlite", "file::memory:")
+
+	_, err := db.DB.Exec("CREATE TABLE foo (pk INTEGER PRIMARY KEY, comment TEXT NOT NULL)")
+	assert.NoError(t, err)
+
+	type foo struct {
+		Pk      int    `sq:"pk"`
+		Comment string `sq:"comment"`
+	}
+
+	tx, err := db.Begin()
+	assert.NoError(t, err)
+
+	insert := sq.Insert("foo").Columns("pk", "comment").StructValues(&foo{Pk: 1, Comment: "comment"})
+	_, err = tx.Exec(insert)
+	assert.NoError(t, err)
+
+	assert.NoError(t, tx.Commit())
+
+	records := []*foo{}
+	getAllQuery := sq.Select("*").From("foo")
+	assert.NoError(t, db.GetAll(getAllQuery, &records))
+	assert.Equal(t, records, []*foo{&foo{Pk: 1, Comment: "comment"}})
 }
 
 func ExampleDb() {

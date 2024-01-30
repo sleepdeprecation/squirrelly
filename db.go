@@ -14,6 +14,26 @@ type Db struct {
 	*sql.DB
 }
 
+type Tx struct {
+	*sql.Tx
+}
+
+// interface for database/sql db like structs
+type Querier interface {
+	Exec(string, ...any) (sql.Result, error)
+	Query(string, ...any) (*sql.Rows, error)
+	QueryRow(string, ...any) *sql.Row
+}
+
+// interface for squirrelly db like structs
+type DbLike interface {
+	Exec(Sqlizer) (sql.Result, error)
+	Query(Sqlizer) (*sql.Rows, error)
+	QueryRow(Sqlizer) *sql.Row
+	Get(Sqlizer, any) error
+	GetAll(Sqlizer, any) error
+}
+
 // Open uses the same convention as [database/sql.Open], a driver name and a source string, both dependant on your driver's package.
 func Open(driver, source string) (*Db, error) {
 	sqldb, err := sql.Open(driver, source)
@@ -24,40 +44,84 @@ func Open(driver, source string) (*Db, error) {
 	return &Db{sqldb}, nil
 }
 
+func (db *Db) Begin() (*Tx, error) {
+	tx, err := db.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+
+	return &Tx{tx}, nil
+}
+
 // Exec runs [database/sql.DB.Exec], using a squirrelly builder.
-func (db *Db) Exec(query Sqlizer) (sql.Result, error) {
+func Exec(db Querier, query Sqlizer) (sql.Result, error) {
 	sql, args, err := query.ToSql()
 	if err != nil {
 		return nil, err
 	}
 
-	return db.DB.Exec(sql, args...)
+	return db.Exec(sql, args...)
+}
+
+// Exec runs [database/sql.DB.Exec], using a squirrelly builder.
+func (db *Db) Exec(query Sqlizer) (sql.Result, error) {
+	return Exec(db.DB, query)
+}
+
+func (tx *Tx) Exec(query Sqlizer) (sql.Result, error) {
+	return Exec(tx.Tx, query)
+}
+
+// Query runs [database/sql.DB.Query] using a squirrelly builder.
+func Query(db Querier, query Sqlizer) (*sql.Rows, error) {
+	sql, args, err := query.ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	return db.Query(sql, args...)
 }
 
 // Query runs [database/sql.DB.Query] using a squirrelly builder.
 func (db *Db) Query(query Sqlizer) (*sql.Rows, error) {
-	sql, args, err := query.ToSql()
-	if err != nil {
-		return nil, err
-	}
+	return Query(db.DB, query)
+}
 
-	return db.DB.Query(sql, args...)
+func (tx *Tx) Query(query Sqlizer) (*sql.Rows, error) {
+	return Query(tx.Tx, query)
 }
 
 // QueryRow runs [database/sql.DB.QueryRow] using a squirrelly builder.
-func (db *Db) QueryRow(query Sqlizer) *sql.Row {
+func QueryRow(db Querier, query Sqlizer) *sql.Row {
 	sql, args, err := query.ToSql()
 	if err != nil {
 		panic(err)
 	}
 
-	return db.DB.QueryRow(sql, args...)
+	return db.QueryRow(sql, args...)
+}
+
+// QueryRow runs [database/sql.DB.QueryRow] using a squirrelly builder.
+func (db *Db) QueryRow(query Sqlizer) *sql.Row {
+	return QueryRow(db.DB, query)
+}
+
+func (tx *Tx) QueryRow(query Sqlizer) *sql.Row {
+	return QueryRow(tx.Tx, query)
 }
 
 // Get runs a query using a squirrelly builder (that should return one and only one result), and marshals the result into the data interface.
 //
 // The data argument must be a pointer, it supports any value that [database/sql.Rows.Scan] supports, or structs that are tagged using the `sq` tag, similar to how the [encoding/json.Marshal] function works using the `json` tag.
 func (db *Db) Get(query Sqlizer, data interface{}) error {
+	return DbGet(db, query, data)
+}
+
+func (tx *Tx) Get(query Sqlizer, data any) error {
+	return DbGet(tx, query, data)
+}
+
+func DbGet(db DbLike, query Sqlizer, data any) error {
 	rows, err := db.Query(query)
 	if err != nil {
 		return err
@@ -70,6 +134,14 @@ func (db *Db) Get(query Sqlizer, data interface{}) error {
 //
 // The container argument must be a pointer to a slice, the slice may be of any value that [database/sql.Rows.Scan] supports, or structs that are tagged using the `sq` tag, similar to how the [encoding/json.Marshal] function works using the `json` tag.
 func (db *Db) GetAll(query Sqlizer, container interface{}) error {
+	return DbGetAll(db, query, container)
+}
+
+func (tx *Tx) GetAll(query Sqlizer, container any) error {
+	return DbGetAll(tx, query, container)
+}
+
+func DbGetAll(db DbLike, query Sqlizer, container any) error {
 	rows, err := db.Query(query)
 	if err != nil {
 		return err
