@@ -36,6 +36,11 @@ func TestDbGet(t *testing.T) {
 	query := sq.Select("*").From("foo").Where(sq.Eq{"pk": 1})
 	assert.NoError(t, db.Get(query, record))
 	assert.Equal(t, record, &foo{Pk: 1, Comment: "comment"})
+
+	singleScanQuery := sq.Select("comment").From("foo").Where(sq.Eq{"pk": 10})
+	var comment string
+	assert.NoError(t, db.Get(singleScanQuery, &comment))
+	assert.Equal(t, comment, "another comment")
 }
 
 func TestTx(t *testing.T) {

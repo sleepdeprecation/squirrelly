@@ -254,18 +254,28 @@ func scanRows(rows *sql.Rows, fn func(*sql.Rows) error) error {
 }
 
 func structScan(rows *sql.Rows, destination interface{}) error {
+	tryScan := false
+
 	dest := reflect.ValueOf(destination)
 	if dest.Kind() != reflect.Ptr {
 		return errors.New("destination is not a pointer")
 	}
 	typ := dest.Elem().Type()
 	if typ.Kind() != reflect.Struct {
-		return errors.New("destination is not a struct")
+		tryScan = true
+		//return errors.New("destination is not a struct")
 	}
 
 	defer rows.Close()
 	if !rows.Next() {
 		return sql.ErrNoRows
+	}
+
+	if tryScan {
+		if err := rows.Scan(destination); err != nil {
+			return errors.New("destination is not a struct, and could not be scanned")
+		}
+		return nil
 	}
 
 	// value := reflect.New(typ)
