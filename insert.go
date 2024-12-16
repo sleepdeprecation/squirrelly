@@ -25,6 +25,7 @@ type insertData struct {
 	Select            *SelectBuilder
 	ConflictKeys      []string
 	UpdateColumns     []string
+	DoNothing         bool
 	Returning         []string
 }
 
@@ -85,17 +86,27 @@ func (d *insertData) ToSql() (sqlStr string, args []interface{}, err error) {
 		sql.WriteString(strings.Join(d.ConflictKeys, ","))
 		sql.WriteString(")")
 
-		if len(d.UpdateColumns) > 0 {
-			sql.WriteString(" DO UPDATE SET")
-			for idx, col := range d.UpdateColumns {
-				if idx != 0 {
-					sql.WriteString(",")
-				}
-
-				sql.WriteString(fmt.Sprintf(" %[1]s = EXCLUDED.%[1]s", col))
+		if d.DoNothing {
+			if len(d.UpdateColumns) > 0 {
+				err = errors.New("insert statements with OnConflict can't use both UpdateColumns and DoNothing")
+				return
 			}
+
+			sql.WriteString(" DO NOTHING")
 		} else {
-			err = errors.New("insert statements with OnConflict set must have at least one column to be updated")
+			if len(d.UpdateColumns) > 0 {
+				sql.WriteString(" DO UPDATE SET")
+				for idx, col := range d.UpdateColumns {
+					if idx != 0 {
+						sql.WriteString(",")
+					}
+
+					sql.WriteString(fmt.Sprintf(" %[1]s = EXCLUDED.%[1]s", col))
+				}
+			} else {
+				err = errors.New("insert statements with OnConflict set must have at least one column to be updated")
+				return
+			}
 		}
 	}
 
@@ -262,6 +273,11 @@ func (b InsertBuilder) SetMap(clauses map[string]interface{}) InsertBuilder {
 // OnConflict is used to turn an insert into an upsert. This is used to add the ON CONFLICT (keys ...) clause. When used with [InsertBuilder.UpdateColumns] the insert builder adds ON CONFLICT (keys ...) DO UPDATE SET ....
 func (b InsertBuilder) OnConflict(conflictKeys ...string) InsertBuilder {
 	return builder.Extend(b, "ConflictKeys", conflictKeys).(InsertBuilder)
+}
+
+// DoNothing, when used with [InsertBuilder.OnConflict], generates ON CONFLICT DO NOTHING clause to the insert builder.
+func (b InsertBuilder) DoNothing() InsertBuilder {
+	return builder.Set(b, "DoNothing", true).(InsertBuilder)
 }
 
 // UpdateColumns, when used with [InsertBuilder.OnConflict], generates ON CONFLICT DO UPDATE clauses to the insert builder.

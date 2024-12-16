@@ -1,6 +1,7 @@
 package squirrelly
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -95,13 +96,36 @@ func TestInsertBuilderReplace(t *testing.T) {
 }
 
 func TestInsertBuilderOnConflictUpdateColumns(t *testing.T) {
-	ib := Insert("table").Columns("field1", "field2", "field3").Values("one", "two", "three").OnConflict("field1").UpdateColumns("field2", "field3")
+	type testCase struct {
+		builder     InsertBuilder
+		expectedSql string
+		expectedErr error
+	}
 
-	expectedSql := "INSERT INTO table (field1,field2,field3) VALUES (?,?,?) ON CONFLICT (field1) DO UPDATE SET field2 = EXCLUDED.field2, field3 = EXCLUDED.field3"
+	cases := []testCase{
+		{
+			builder:     Insert("table").Columns("field1", "field2", "field3").Values("one", "two", "three").OnConflict("field1").UpdateColumns("field2", "field3"),
+			expectedSql: "INSERT INTO table (field1,field2,field3) VALUES (?,?,?) ON CONFLICT (field1) DO UPDATE SET field2 = EXCLUDED.field2, field3 = EXCLUDED.field3",
+		},
+		{
+			builder:     Insert("table").Columns("field1", "field2", "field3").Values("one", "two", "three").OnConflict("field1").DoNothing(),
+			expectedSql: "INSERT INTO table (field1,field2,field3) VALUES (?,?,?) ON CONFLICT (field1) DO NOTHING",
+		},
+		{
+			builder:     Insert("table").Columns("field1", "field2", "field3").Values("one", "two", "three").OnConflict("field1").UpdateColumns("field2").DoNothing(),
+			expectedErr: errors.New("insert statements with OnConflict can't use both UpdateColumns and DoNothing"),
+		},
+	}
 
-	sql, _, err := ib.ToSql()
-	assert.NoError(t, err)
-	assert.Equal(t, expectedSql, sql)
+	for _, c := range cases {
+		sql, _, err := c.builder.ToSql()
+		if c.expectedErr == nil {
+			assert.NoError(t, err)
+			assert.Equal(t, c.expectedSql, sql)
+		} else {
+			assert.Equal(t, c.expectedErr, err)
+		}
+	}
 }
 
 func TestInsertStructValues(t *testing.T) {
