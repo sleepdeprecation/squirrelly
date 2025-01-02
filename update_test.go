@@ -88,3 +88,33 @@ func TestUpdateBuilderFromSelect(t *testing.T) {
 			"WHERE employees.account_id = subquery.id"
 	assert.Equal(t, expectedSql, sql)
 }
+
+func TestUpdateSetStruct(t *testing.T) {
+	record := struct {
+		Pk      int    `sq:"pk"`
+		Comment string `sq:"comment"`
+	}{
+		Pk:      1,
+		Comment: "updated comment here",
+	}
+
+	ub := Update("table").
+		SetStruct(record, "comment").
+		Where(Eq{"pk": 1})
+
+	sql, args, err := ub.ToSql()
+	assert.NoError(t, err)
+
+	expectedSql :=
+		"UPDATE table " +
+			"SET comment = ? " +
+			"WHERE pk = ?"
+
+	assert.Equal(t, expectedSql, sql)
+
+	expectedArgs := []interface{}{
+		"updated comment here",
+		1,
+	}
+	assert.Equal(t, expectedArgs, args)
+}

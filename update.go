@@ -3,6 +3,7 @@ package squirrelly
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -184,6 +185,28 @@ func (b UpdateBuilder) SetMap(clauses map[string]interface{}) UpdateBuilder {
 	for _, key := range keys {
 		val, _ := clauses[key]
 		b = b.Set(key, val)
+	}
+	return b
+}
+
+// SetStruct sets values for an update builder from the provided struct, using the specified columns.
+//
+// This is a convenience method that calls .Set for each column specified.
+func (b UpdateBuilder) SetStruct(data interface{}, columns ...string) UpdateBuilder {
+	if data == nil {
+		return b
+	}
+
+	mapper := getMapper()
+	lookup := mapper.FieldMap(reflect.ValueOf(data))
+
+	for _, column := range columns {
+		value, hasValue := lookup[column]
+		if !hasValue {
+			panic(fmt.Errorf("missing column `%[1]s` in struct. Is it tagged with `sq:\"%[1]s\"`?", column))
+		}
+
+		b = b.Set(column, value.Interface())
 	}
 	return b
 }
