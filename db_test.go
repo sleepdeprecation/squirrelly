@@ -43,6 +43,26 @@ func TestDbGet(t *testing.T) {
 	assert.Equal(t, comment, "another comment")
 }
 
+func TestDbGetTextPk(t *testing.T) {
+	db, _ := sq.Open("sqlite", "file::memory:")
+
+	_, err := db.DB.Exec("CREATE TABLE foo (bar TEXT PRIMARY KEY)")
+	assert.NoError(t, err)
+
+	type foo struct {
+		Bar string `sq:"bar"`
+	}
+
+	insert := sq.Insert("foo").Columns("bar").StructValues(&foo{Bar: "this is some text"})
+	_, err = db.Exec(insert)
+	assert.NoError(t, err)
+
+	records := []*foo{}
+	getAllQuery := sq.Select("*").From("foo").OrderBy("bar ASC")
+	assert.NoError(t, db.GetAll(getAllQuery, &records))
+	assert.Equal(t, records, []*foo{&foo{Bar: "this is some text"}})
+}
+
 func TestTx(t *testing.T) {
 	db, _ := sq.Open("sqlite", "file::memory:")
 

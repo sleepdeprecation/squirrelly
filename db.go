@@ -202,7 +202,7 @@ func DbGetAll(db DbLike, query Sqlizer, container any) error {
 		elem := reflect.New(elemType)
 
 		var elemValues []interface{}
-		if len(columns) == 1 {
+		if len(columns) == 1 && elemType.Kind() != reflect.Struct {
 			elemValues = []interface{}{elem.Interface()}
 		} else {
 			elemValues = make([]interface{}, len(columns))
