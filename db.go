@@ -236,6 +236,81 @@ func DbGetAll(db DbLike, query Sqlizer, container any) error {
 	return nil
 }
 
+func DbGetMap[K comparable, V any](db DbLike, query Sqlizer, keyColumn string) (map[K]V, error) {
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(map[K]V)
+
+	keyType := reflect.TypeFor[K]()
+	elemType := reflect.TypeFor[V]()
+	isPtr := elemType.Kind() == reflect.Ptr
+	if isPtr {
+		elemType = elemType.Elem()
+	}
+
+	columns, _ := rows.Columns()
+	mapper := getMapper()
+	fieldTraversals := mapper.TraversalsByName(elemType, columns)
+
+	keyIdx := -1
+	for idx, f := range fieldTraversals {
+		if columns[idx] == keyColumn {
+			keyIdx = idx
+
+			typ := elemType.FieldByIndex(f).Type
+			if typ != keyType {
+				return nil, fmt.Errorf("key column is not of type %v", keyType)
+			}
+		}
+
+		if len(f) == 0 {
+			return nil, fmt.Errorf("missing destination name %s in %s", columns[idx], elemType.Name())
+		}
+	}
+
+	if keyIdx == -1 {
+		return nil, fmt.Errorf("no column found with key %s in %s", keyColumn, elemType.Name())
+	}
+
+	err = scanRows(rows, func(row *sql.Rows) error {
+		elem := reflect.New(elemType)
+
+		elemValues := make([]any, len(columns))
+		var keyValue reflect.Value
+		for idx, traversal := range fieldTraversals {
+			field := reflectx.FieldByIndexes(elem, traversal)
+			elemValues[idx] = field.Addr().Interface()
+
+			if idx == keyIdx {
+				keyValue = field
+			}
+		}
+
+		err := row.Scan(elemValues...)
+		if err != nil {
+			return err
+		}
+
+		if !isPtr {
+			elem = reflect.Indirect(elem)
+		}
+
+		key := keyValue.Interface().(K)
+		value := elem.Interface().(V)
+		out[key] = value
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
 func scanRows(rows *sql.Rows, fn func(*sql.Rows) error) error {
 	defer rows.Close()
 	for rows.Next() {

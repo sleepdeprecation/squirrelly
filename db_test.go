@@ -101,6 +101,33 @@ func TestTx(t *testing.T) {
 	})
 }
 
+func TestDbGetMap(t *testing.T) {
+	db, _ := sq.Open("sqlite", "file::memory:")
+
+	_, err := db.DB.Exec("CREATE TABLE foo (pk INTEGER PRIMARY KEY AUTOINCREMENT, comment TEXT NOT NULL)")
+	assert.NoError(t, err)
+
+	type foo struct {
+		Pk      int    `sq:"pk"`
+		Comment string `sq:"comment"`
+	}
+
+	insert := sq.Insert("foo").Columns("comment").Values("first").Values("second").Values("third").Values("fourth")
+	_, err = db.Exec(insert)
+	assert.NoError(t, err)
+
+	query := sq.Select("*").From("foo")
+	records, err := sq.DbGetMap[int, *foo](db, query, "pk")
+	assert.NoError(t, err)
+
+	assert.Equal(t, records, map[int]*foo{
+		1: {Pk: 1, Comment: "first"},
+		2: {Pk: 2, Comment: "second"},
+		3: {Pk: 3, Comment: "third"},
+		4: {Pk: 4, Comment: "fourth"},
+	})
+}
+
 func ExampleDb() {
 	// open a sqlite database in memory
 	db, _ := sq.Open("sqlite", "file::memory:")
