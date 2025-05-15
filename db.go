@@ -243,10 +243,19 @@ func DbGetMap[K comparable, V any](db DbLike, query Sqlizer, keyColumn string) (
 	}
 	defer rows.Close()
 
-	out := make(map[K]V)
-
 	keyType := reflect.TypeFor[K]()
 	elemType := reflect.TypeFor[V]()
+
+	outType := reflect.MapOf(keyType, elemType)
+	out := reflect.MakeMap(outType)
+
+	isSlice := elemType.Kind() == reflect.Slice
+	var containerType reflect.Type
+	if isSlice {
+		containerType = reflect.TypeFor[V]()
+		elemType = elemType.Elem()
+	}
+
 	isPtr := elemType.Kind() == reflect.Ptr
 	if isPtr {
 		elemType = elemType.Elem()
@@ -299,16 +308,25 @@ func DbGetMap[K comparable, V any](db DbLike, query Sqlizer, keyColumn string) (
 			elem = reflect.Indirect(elem)
 		}
 
-		key := keyValue.Interface().(K)
-		value := elem.Interface().(V)
-		out[key] = value
+		if isSlice {
+			mapVal := out.MapIndex(keyValue)
+			if !mapVal.IsValid() || mapVal.IsNil() || mapVal.IsZero() {
+				mapVal = reflect.MakeSlice(containerType, 0, 1)
+			}
+
+			mapVal = reflect.Append(mapVal, elem)
+			out.SetMapIndex(keyValue, mapVal)
+		} else {
+			out.SetMapIndex(keyValue, elem)
+		}
+
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return out, nil
+	return out.Interface().(map[K]V), nil
 }
 
 func scanRows(rows *sql.Rows, fn func(*sql.Rows) error) error {

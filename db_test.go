@@ -126,6 +126,31 @@ func TestDbGetMap(t *testing.T) {
 		3: {Pk: 3, Comment: "third"},
 		4: {Pk: 4, Comment: "fourth"},
 	})
+
+	_, err = db.Exec(insert)
+	assert.NoError(t, err)
+
+	recSlice, err := sq.DbGetMap[string, []*foo](db, query, "comment")
+	assert.NoError(t, err)
+
+	assert.Equal(t, recSlice, map[string][]*foo{
+		"first": {
+			{Pk: 1, Comment: "first"},
+			{Pk: 5, Comment: "first"},
+		},
+		"second": {
+			{Pk: 2, Comment: "second"},
+			{Pk: 6, Comment: "second"},
+		},
+		"third": {
+			{Pk: 3, Comment: "third"},
+			{Pk: 7, Comment: "third"},
+		},
+		"fourth": {
+			{Pk: 4, Comment: "fourth"},
+			{Pk: 8, Comment: "fourth"},
+		},
+	})
 }
 
 func ExampleDb() {
